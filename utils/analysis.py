@@ -8,6 +8,13 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from utils.text_processor import *
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
+
 from sklearn.manifold import MDS, TSNE
 
 def analyze_vocabulary(texts, min_freq=2):
@@ -48,6 +55,20 @@ def analyze_vocabulary(texts, min_freq=2):
     }
     
     return freq_df, stats
+
+
+  # Check if posts is indeed a DataFrame
+def process_column(posts, include_selftext = False):
+    if not isinstance(posts, pd.DataFrame):
+      raise ValueError("Input `posts` should be a pandas DataFrame.")
+    texts = posts['title'].apply(preprocess_text)
+    if include_selftext:
+      # Add 'selftext' to each text if requested
+      texts += ' ' + posts['selftext'].apply(preprocess_text)
+
+    # Convert texts to a list format for further analysis
+    texts = texts.tolist()
+    return texts
 
 
 def tfidf_analyze_subreddit(posts, max_terms=1000, min_doc_freq=2, include_selftext=False):
@@ -209,6 +230,55 @@ def plot_word_timeseries(df, terms, figsize=(12, 6), include_selftext=False):
     plt.tight_layout()
     
     return fig, ax
+
+
+def plot_kmeans(X, n, random_state=42):
+    # Create and fit the k-means model
+    kmeans = KMeans(n_clusters=n, random_state=random_state)
+    cluster_labels = kmeans.fit_predict(X)
+
+    # Reduce dimensionality for visualization
+    pca = PCA(n_components=2, random_state=42)
+    X_reduced = pca.fit_transform(X.toarray())
+
+    # Plot the results
+    plt.figure(figsize=(10, 6))
+
+    # Plot the data points, colored by their cluster assignments
+    plt.scatter(X_reduced[:, 0], X_reduced[:, 1], c=cluster_labels, cmap='viridis')
+
+    # Plot the cluster centers (reduced to 2D with PCA)
+    centroids_reduced = pca.transform(kmeans.cluster_centers_)
+    plt.scatter(centroids_reduced[:, 0], 
+            centroids_reduced[:, 1], 
+            c='red', 
+            marker='x', 
+            s=200, 
+            linewidth=3, 
+            label='Centroids')
+
+    plt.title('K-means Clustering on Text Data')
+    plt.xlabel('PCA Feature 1')
+    plt.ylabel('PCA Feature 2')
+    plt.legend()
+    plt.show()
+
+
+def plot_multinomialNB(X, corpus_labels, test_size=0.3, random_state=42):
+    # Split data for NBC
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, corpus_labels, test_size=test_size, random_state=random_state
+    )
+
+    # Naive Bayes Classification
+    nbc = MultinomialNB()
+    nbc.fit(X_train, y_train)
+    nbc_pred = nbc.predict(X_test)
+
+    # Analyze results
+    print("Naive Bayes Classification Results:")
+    print(classification_report(y_test, nbc_pred))
+
 
 def plot_word_similarities_mds(tfidf_matrix, feature_names, n_terms=10, similarity_threshold=0.3, title=None):
     """
